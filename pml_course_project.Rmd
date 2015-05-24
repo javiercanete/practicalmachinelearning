@@ -1,0 +1,99 @@
+##Practical Machine Learning - Course Project
+
+### Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+### Data
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. 
+
+### What you should submit
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+1. Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+2. You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details. 
+
+### Load necessary packages
+
+```{r}
+library(caret)
+```
+
+### Load data
+
+```{r}
+#csv files has to be in working directory. Load data and convert values "NA","" &"#DIV/0!" to NA. 
+setwd("C:/Users/Javier/Desktop/pml_project")
+pml_training_set <- read.csv("pml-training.csv",sep=",",header=TRUE,na.strings=c("NA","","#DIV/0!"))
+pml_test_to_upload_set <- read.csv("pml-testing.csv",sep=",",header=TRUE,na.strings=c("NA","","#DIV/0!"))
+```
+
+### Data Cleaning
+
+```{r}
+#only keep columns with at least 50% non-blanks
+pml_training_set <- pml_training_set[, colSums(is.na(pml_training_set)) < nrow(pml_training_set) * 0.5]
+
+#drop row number, user name and timestamp columns -not relevant for the model
+pml_training_set <- pml_training_set[ , -which(names(pml_training_set) %in% c("X","user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp"))]
+
+```
+
+### Split data set into training and testing sets
+
+```{r}
+# 70% of the data is used for the training set and 30% for the testing set
+mydf <- createDataPartition(y=pml_training_set$classe, p=0.7, list=FALSE )
+training_set <- pml_training_set[mydf,]
+testing_set <- pml_training_set[-mydf,]
+```
+
+### Modeling: Random Forest
+
+- For this model, the accuracy is over 99% and therefore the out of sample error is less than 1%.. 
+
+```{r}
+#random forest with a 4-fold cross validation on training data
+#set seed
+set.seed(6789)
+#train control for cross-validation
+tc = trainControl(method = "cv", number = 5)
+
+#fit model 
+modFit <- train(classe ~., data = training_set, method="rf", trControl = tc, prox = TRUE, allowParallel = TRUE)
+print(modFit)
+print(modFit$finalModel)
+```
+
+### Predictions on testing set
+
+```{r}
+my_prediction <- predict(modFit, newdata=testing_set)
+my_cm <- confusionMatrix(my_prediction, testing_set$classe)
+print(my_cm)
+```
+
+### Submitting files
+
+```{r}
+pml_write_files = function(x) {
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+  }
+}
+
+submission_set <- predict(modFit, newdata = pml_test_to_upload_set)
+pml_write_files(submission_set)
+```
